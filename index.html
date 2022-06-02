@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<meta name="theme-color" content="#000000">
+	<meta name="rnbo-version" content="0.15.0">
+	<title>RNBO Webexport</title>
+
+	<style>
+		html, body {
+			margin: 0;
+			padding: 0;
+		}
+
+		#rnbo-root {
+			height: 100vh;
+			width: 100vw;
+		}
+	</style>
+</head>
+
+<body>
+	<noscript>You need to enable JavaScript to run this app.</noscript>
+	<div id="rnbo-root"></div>
+
+	<!-- Import RNBO Engine Wrapper -->
+	<script type="text/javascript" src="https://c74-public.nyc3.digitaloceanspaces.com/rnbo/0.15.0/rnbo.min.js"></script>
+
+	
+	<!-- Import RNBO UI -->
+	<script type="text/javascript" src="https://c74-public.nyc3.digitaloceanspaces.com/rnbo/0.15.0/rnboui.min.js"></script>
+	
+	<!-- Import RNBO DevTools -->
+	<script type="text/javascript" src="https://c74-public.nyc3.digitaloceanspaces.com/rnbo/0.15.0/rnbodev.min.js"></script>
+
+	<script>
+		// Create AudioContext
+		var WAContext = window.AudioContext || window.webkitAudioContext;
+		var context = new WAContext();
+
+		// Create gain node and connect it to audio output
+		var outputNode = context.createGain();
+		outputNode.connect(context.destination);
+
+		var patcher;
+		var presets = [];
+		var samples = [];
+
+		fetch("patch.export.json")
+			.then((response) => response.json())
+
+			.then((responseJson) => {
+				patcher = responseJson;
+			})
+
+			// Use the fetched patcher to create a RNBO device
+			.then(() => {
+				presets = patcher.presets ? patcher.presets : [];
+				return RNBO.createDevice({
+					context,
+					patcher
+				});
+			})
+
+			.then((device) => {
+
+				// When the device is ready, connect it to audio output
+				device.node.connect(outputNode);
+
+				// RNBOUI Setup
+				// Create a renderer to display the device layout
+				var deviceUI = RNBOUI.createRenderer(
+					device,
+					patcher,
+					document.getElementById("rnbo-root"), // the DOMElement that holds our RNBO UI,
+					{
+						showEnableOverlay: true
+					}
+				);
+				
+
+				
+				// DevTools Setup
+				var devGui = new RNBODev.GUI({ device, outputNode, presets });
+				
+				return device;
+			})
+			.then(async (device) => {
+				// (Optional) load dependencies
+				let dependencies = undefined;
+				try {
+					const rawResponse = await fetch("dependencies.json");
+					dependencies = await rawResponse.json();
+				} finally {
+					return device.loadDataBufferDependencies(dependencies);
+				}
+			})
+			.catch((err) => {
+				console.error(err)
+			});
+	</script>
+</body>
+</html>
